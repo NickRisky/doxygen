@@ -5463,6 +5463,7 @@ g_lang2extMap[] =
   { "sql",         "sql",           SrcLangExt_SQL,      ".sql" },
   { "md",          "md",            SrcLangExt_Markdown, ".md"  },
   { "lex",         "lex",           SrcLangExt_Lex,      ".l"   },
+  { "groovy",      "c",             SrcLangExt_Groovy,   ".groovy"},
   { 0,             0,              (SrcLangExt)0,        0      }
 };
 

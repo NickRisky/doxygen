@@ -1431,6 +1431,7 @@ FILE_VERSION_FILTER = "cleartool desc -fmt \%Vn"
       <value name='*.cpp'/>
       <value name='*.c++'/>
       <value name='*.java'/>
+      <value name='*.groovy'/>
       <value name='*.ii'/>
       <value name='*.ixx'/>
       <value name='*.ipp'/>

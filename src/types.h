@@ -57,7 +57,8 @@ enum SrcLangExt
   SrcLangExt_Markdown = 0x10000,
   SrcLangExt_SQL      = 0x20000,
   SrcLangExt_Slice    = 0x40000,
-  SrcLangExt_Lex      = 0x80000
+  SrcLangExt_Lex      = 0x80000,
+  SrcLangExt_Groovy   = 0x100000
 };
 
 /** Grouping info */
