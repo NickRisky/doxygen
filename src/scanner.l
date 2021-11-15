@@ -126,7 +126,7 @@ struct scannerYY_state
 
   SrcLangExt       language = SrcLangExt_Unknown;
   bool             insideIDL   = false;                //!< processing IDL code?
-  bool             insideJava  = false;                //!< processing Java code?
+  bool             insideJava  = true;                 //!< processing Java code?
   bool             insideCS    = false;                //!< processing C# code?
   bool             insideD     = false;                //!< processing D code?
   bool             insidePHP   = false;                //!< processing PHP code?
@@ -134,7 +134,7 @@ struct scannerYY_state
   bool             insideCli   = false;            //!< processing C++/CLI code?
   bool             insideJS    = false;            //!< processing JavaScript code?
   bool             insideSlice = false;            //!< processing Slice code?
-  bool             insideCpp   = true;             //!< processing C/C++ code
+  bool             insideCpp   = false;             //!< processing C/C++ code
 
   bool             insideCppQuote = false;
   bool             insideProtocolList = false;
@@ -1743,6 +1743,7 @@ NONLopt [^\n]*
                                         }
 <JavaImport>({ID}{BN}*"."{BN}*)+"*"     { // package import => add as a using directive
                                           lineCount(yyscanner);
+                                          //printf("import name = %s -> %s\n",yytext,qPrint(yyextra->current->name));
                                           QCString scope=yytext;
                                           yyextra->current->name=removeRedundantWhiteSpace(substitute(scope.left(scope.length()-1),".","::"));
                                           yyextra->current->fileName = yyextra->yyFileName;
@@ -1753,6 +1754,7 @@ NONLopt [^\n]*
                                         }
 <JavaImport>({ID}{BN}*"."{BN}*)+{ID}    { // class import => add as a using declaration
                                           lineCount(yyscanner);
+                                          //printf("import name = %s -> %s\n",yytext,qPrint(yyextra->current->name));
                                           QCString scope=yytext;
                                           yyextra->current->name=removeRedundantWhiteSpace(substitute(scope,".","::"));
                                           yyextra->current->fileName = yyextra->yyFileName;
@@ -2179,6 +2181,21 @@ NONLopt [^\n]*
                                           BEGIN(yyextra->requiresContext);
                                         }
 <FindMembers,FindMemberName>{SCOPENAME} {
+                                          QCString oldType = yyextra->current->type;
+                                          if (yyextra->insideJava && (yyextra->yyLineNr != yyextra->yyBegLineNr) &&
+                                             oldType.size() > 1 ) {
+
+                                            //printf(qPrint(oldType));
+                                            //printf("scope %s", qPrint(oldType));
+                                            yyextra->current->fileName   = yyextra->yyFileName;
+                                            yyextra->current->startLine  = yyextra->yyBegLineNr;
+                                            yyextra->current->startColumn = yyextra->yyBegColNr;
+                                            yyextra->current->args       = yyextra->current->args.simplifyWhiteSpace();
+                                            yyextra->current->name       = yyextra->current->name.stripWhiteSpace();
+                                            yyextra->current->section    = Entry::VARIABLE_SEC;
+                                            yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
+                                            initEntry(yyscanner);
+                                          }
                                           if (yyextra->clangParser && (yyextra->insideCpp || yyextra->insideObjC))
                                           {
                                             yyextra->current->id = yyextra->clangParser->lookup(yyextra->yyLineNr,yytext);
@@ -2190,7 +2207,7 @@ NONLopt [^\n]*
                                           {
                                             BEGIN(CppQuote);
                                           }
-                                          else if ((yyextra->insideIDL || yyextra->insideJava || yyextra->insideD) && yyleng==6 && qstrcmp(yytext,"import")==0)
+                                          else if ((yyextra->insideIDL || yyextra->insideJava  || yyextra->insideD) && qstrcmp(yytext,"import")==0)
                                           {
                                             if (yyextra->insideIDL)
                                               BEGIN(NextSemi);
@@ -2348,6 +2365,8 @@ NONLopt [^\n]*
                                             else
                                             {
                                               yyextra->externC=FALSE; // see bug759247
+                                              //printf("member %s", yytext);
+                                              //printf("=> at line %d \n",yyextra->yyLineNr);
                                               BEGIN(FindMembers);
                                             }
                                           }
@@ -2781,7 +2800,25 @@ NONLopt [^\n]*
                                           yyextra->current->initializer << *yytext;
                                           BEGIN(GCopyCurly);
                                         }
-<ReadInitializer,ReadInitializerPtr>[;,] {
+<ReadInitializer,ReadInitializerPtr>"\n" {
+                                           if (yyextra->insideJava)
+                                           {
+                                             //printf("BR");
+                                             //printf(" LineNr=%d\n",yyextra->yyLineNr);
+                                             //printf(">> initializer '%s' <<\n",qPrint(yyextra->current->initializer.str()));
+                                             yyextra->current->fileName   = yyextra->yyFileName;
+                                             yyextra->current->startLine  = yyextra->yyLineNr;
+                                             yyextra->current->startColumn = yyextra->yyColNr;
+                                             yyextra->current->args       = yyextra->current->args.simplifyWhiteSpace();
+                                             yyextra->current->name       = yyextra->current->name.stripWhiteSpace();
+                                             yyextra->current->section    = Entry::VARIABLE_SEC;
+                                             yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
+                                             initEntry(yyscanner);
+                                             //printf("initializer");
+                                             BEGIN(FindMembers);
+                                            }
+                                          }
+<ReadInitializer,ReadInitializerPtr>[;,\n] {
                                           //printf(">> initializer '%s' <<\n",qPrint(yyextra->current->initializer));
                                           if (*yytext==';' && (yyextra->current_root->spec&Entry::Enum))
                                           {
@@ -2797,6 +2834,9 @@ NONLopt [^\n]*
                                           }
                                           else if (*yytext==';' || (yyextra->lastInitializerContext==FindFields && yyextra->initBracketCount==0)) // yyextra->initBracketCount==0 was added for bug 665778
                                           {
+                                            //printf("quote");
+                                            //printf(yytext);
+                                            //printf("=> at line %d \n",yyextra->yyLineNr);
                                             unput(*yytext);
                                             if (YY_START == ReadInitializerPtr) yyextra->current->initializer.str(std::string());
                                             BEGIN(yyextra->lastInitializerContext);
@@ -3367,6 +3407,10 @@ NONLopt [^\n]*
                                         }
 <FindMembers>[;,]                       {
                                           QCString oldType = yyextra->current->type;
+                                          //printf(yytext);
+                                          //saving here
+                                          //printf(qPrint(oldType));
+                                          //printf("=> at line %d \n",yyextra->yyLineNr);
                                           if (yyextra->current->bodyLine==-1)
                                           {
                                             yyextra->current->bodyLine = yyextra->yyLineNr;
@@ -6266,10 +6310,10 @@ NONLopt [^\n]*
                                             BEGIN( Comment ) ;
                                           }
                                         }
-<FindMembers,FindFields,MemberSpec,FuncQual,SkipCurly,Operator,ClassVar,SkipInits,Bases,OldStyleArgs>({CPPC}{B}*)?{CCS}"*"/{NCOMM} {
+<FindMembers,FindFields,MemberSpec,FuncQual,SkipCurly,Operator,ClassVar,SkipInits,Bases,OldStyleArgs>({CPPC}{B}*)?{CCS}/{NCOMM} {
                                           yyextra->lastDocContext = YY_START;
 
-                                          //printf("Found comment block at %s:%d\n",yyextra->yyFileName,yyextra->yyLineNr);
+                                          //printf("Found comment block at line %d\n",yyextra->yyLineNr);
                                           if (yyextra->current_root->section & Entry::SCOPE_MASK)
                                           {
                                             yyextra->current->inside = yyextra->current_root->name+"::";
@@ -7079,7 +7123,7 @@ static void setContext(yyscan_t yyscanner)
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
   yyextra->language    = getLanguageFromFileName(yyextra->yyFileName);
   yyextra->insideIDL   = yyextra->language==SrcLangExt_IDL;
-  yyextra->insideJava  = yyextra->language==SrcLangExt_Java;
+  yyextra->insideJava  = true;
   yyextra->insideCS    = yyextra->language==SrcLangExt_CSharp;
   yyextra->insideD     = yyextra->language==SrcLangExt_D;
   yyextra->insidePHP   = yyextra->language==SrcLangExt_PHP;

@@ -5463,7 +5463,7 @@ g_lang2extMap[] =
   { "sql",         "sql",           SrcLangExt_SQL,      ".sql" },
   { "md",          "md",            SrcLangExt_Markdown, ".md"  },
   { "lex",         "lex",           SrcLangExt_Lex,      ".l"   },
-  { "groovy",      "c",             SrcLangExt_Groovy,   ".groovy"},
+  { "groovy",      "c",             SrcLangExt_Java,   ".groovy"},
   { 0,             0,              (SrcLangExt)0,        0      }
 };
 
@@ -5533,6 +5533,7 @@ void initDefaultExtensionMapping()
   updateLanguageMapping(".ddl",      "idl");
   updateLanguageMapping(".odl",      "idl");
   updateLanguageMapping(".java",     "java");
+  updateLanguageMapping(".groovy", "groovy");
   //updateLanguageMapping(".as",       "javascript"); // not officially supported
   //updateLanguageMapping(".js",       "javascript"); // not officially supported
   updateLanguageMapping(".cs",       "csharp");
