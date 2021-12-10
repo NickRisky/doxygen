@@ -2184,7 +2184,6 @@ NONLopt [^\n]*
                                           QCString oldType = yyextra->current->type;
                                           if (yyextra->insideJava && (yyextra->yyLineNr != yyextra->yyBegLineNr) &&
                                              oldType.size() > 1 ) {
-
                                             //printf(qPrint(oldType));
                                             //printf("scope %s", qPrint(oldType));
                                             yyextra->current->fileName   = yyextra->yyFileName;
@@ -2805,21 +2804,29 @@ NONLopt [^\n]*
                                            {
                                              //printf("BR");
                                              //printf(" LineNr=%d\n",yyextra->yyLineNr);
-                                             //printf(">> initializer '%s' <<\n",qPrint(yyextra->current->initializer.str()));
-                                             yyextra->current->fileName   = yyextra->yyFileName;
-                                             yyextra->current->startLine  = yyextra->yyLineNr;
-                                             yyextra->current->startColumn = yyextra->yyColNr;
-                                             yyextra->current->args       = yyextra->current->args.simplifyWhiteSpace();
-                                             yyextra->current->name       = yyextra->current->name.stripWhiteSpace();
-                                             yyextra->current->section    = Entry::VARIABLE_SEC;
-                                             yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
-                                             initEntry(yyscanner);
-                                             //printf("initializer");
-                                             BEGIN(FindMembers);
+                                             //printf(" SquareCount=%d\n",yyextra->initBracketCount);
+                                             if (yyextra->initBracketCount > 0)
+                                             {
+                                                 yyextra->current->initializer << *yytext;
+                                             }
+                                             else
+                                             {
+                                                //printf(">> initializer '%s' <<\n",qPrint(yyextra->current->initializer.str()));
+                                                yyextra->current->fileName   = yyextra->yyFileName;
+                                                yyextra->current->startLine  = yyextra->yyLineNr;
+                                                yyextra->current->startColumn = yyextra->yyColNr;
+                                                yyextra->current->args       = yyextra->current->args.simplifyWhiteSpace();
+                                                yyextra->current->name       = yyextra->current->name.stripWhiteSpace();
+                                                yyextra->current->section    = Entry::VARIABLE_SEC;
+                                                yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
+                                                initEntry(yyscanner);
+                                                BEGIN(FindMembers);
+                                             }
                                             }
                                           }
-<ReadInitializer,ReadInitializerPtr>[;,\n] {
-                                          //printf(">> initializer '%s' <<\n",qPrint(yyextra->current->initializer));
+<ReadInitializer,ReadInitializerPtr>[;,] {
+                                          //printf(yytext);
+                                          //printf(" LineNr=%d\n",yyextra->yyLineNr);
                                           if (*yytext==';' && (yyextra->current_root->spec&Entry::Enum))
                                           {
                                             yyextra->current->fileName   = yyextra->yyFileName;
@@ -3386,6 +3393,10 @@ NONLopt [^\n]*
                                           }
                                           else
                                           {
+                                            if (yyextra->insideJava)
+                                            {
+                                               REJECT;
+                                            }
                                             if (yyextra->current->type.isEmpty()) // anonymous padding field, e.g. "int :7;"
                                             {
                                               addType(yyscanner);
@@ -3843,10 +3854,15 @@ NONLopt [^\n]*
                                             REJECT;
                                           }
                                         }
-<ReadBody,ReadNSBody,ReadBodyIntf>\"    { yyextra->current->program << yytext ;
-                                          yyextra->pCopyQuotedGString = &yyextra->current->program;
-                                          yyextra->lastStringContext=YY_START;
-                                          BEGIN( CopyGString );
+<ReadBody,ReadNSBody,ReadBodyIntf>\"    {
+                                          //printf("ReadBody count=%d ",yyextra->curlyCount);
+                                          if (!yyextra->insideJava)
+                                          {
+                                            yyextra->current->program << yytext ;
+                                            yyextra->pCopyQuotedGString = &yyextra->current->program;
+                                            yyextra->lastStringContext=YY_START;
+                                            BEGIN( CopyGString );
+                                          }
                                         }
 <ReadBody,ReadNSBody,ReadBodyIntf>{CCS}{B}*              { yyextra->current->program << yytext ;
                                           yyextra->lastContext = YY_START ;
@@ -3858,13 +3874,11 @@ NONLopt [^\n]*
                                           BEGIN( Comment ) ;
                                         }
 <ReadBody,ReadNSBody,ReadBodyIntf>"'"   {
-                                          if (!yyextra->insidePHP)
+                                          //printf("ReadBody count=%d ",yyextra->curlyCount);
+                                          yyextra->current->program << yytext;
+                                          if (yyextra->insidePHP)
                                           {
-                                            yyextra->current->program << yytext;
-                                          }
-                                          else
-                                          { // begin of single quoted string
-                                            yyextra->current->program << yytext;
+                                            // begin of single quoted string
                                             yyextra->pCopyQuotedGString = &yyextra->current->program;
                                             yyextra->lastStringContext=YY_START;
                                             BEGIN(CopyPHPGString);
@@ -3881,14 +3895,21 @@ NONLopt [^\n]*
                                                 yyextra->current->program << yytext;
                                               }
                                             }
-<ReadBody,ReadNSBody,ReadBodyIntf>"{"   { yyextra->current->program << yytext ;
+<ReadBody,ReadNSBody,ReadBodyIntf>"{"   {
+                                          //printf("ReadBody{ count=%d ",yyextra->curlyCount);
+                                          //printf("Line at => %d\n", yyextra->yyLineNr);
+                                          yyextra->current->program << yytext ;
                                           ++yyextra->curlyCount ;
                                         }
 <ReadBodyIntf>"}"                       {
+                                          //printf("ReadBody} count=%d ",yyextra->curlyCount);
+                                          //printf("Line at => %d\n", yyextra->yyLineNr);
                                           yyextra->current->program << yytext ;
                                           --yyextra->curlyCount ;
                                         }
 <ReadBody,ReadNSBody>"}"                { //err("ReadBody count=%d\n",yyextra->curlyCount);
+                                          //printf("ReadBody} count=%d ",yyextra->curlyCount);
+                                          //printf("Line at => %d\n", yyextra->yyLineNr);
                                           if ( yyextra->curlyCount>0 )
                                           {
                                             yyextra->current->program << yytext ;
@@ -6310,7 +6331,7 @@ NONLopt [^\n]*
                                             BEGIN( Comment ) ;
                                           }
                                         }
-<FindMembers,FindFields,MemberSpec,FuncQual,SkipCurly,Operator,ClassVar,SkipInits,Bases,OldStyleArgs>({CPPC}{B}*)?{CCS}/{NCOMM} {
+<FindMembers,FindFields,MemberSpec,FuncQual,SkipCurly,Operator,ClassVar,SkipInits,Bases,OldStyleArgs>({CPPC}{B}*)?{CCS}"*"/{NCOMM} {
                                           yyextra->lastDocContext = YY_START;
 
                                           //printf("Found comment block at line %d\n",yyextra->yyLineNr);
@@ -7655,6 +7676,17 @@ static void parseMain(yyscan_t yyscanner,
 
   parseCompounds(yyscanner,rt);
 
+  //if some variables left unparsed
+  if (yyextra->insideJava && !yyextra->current->name.isEmpty() && yyextra->current->type.size() > 1){
+    yyextra->current->fileName   = yyextra->yyFileName;
+    yyextra->current->startLine  = yyextra->yyBegLineNr;
+    yyextra->current->startColumn = yyextra->yyBegColNr;
+    yyextra->current->args       = yyextra->current->args.simplifyWhiteSpace();
+    yyextra->current->name       = yyextra->current->name.stripWhiteSpace();
+    yyextra->current->section    = Entry::VARIABLE_SEC;
+    yyextra->current_root->moveToSubEntryAndRefresh(yyextra->current);
+    initEntry(yyscanner);
+  }
   anonNSCount++;
 
   // add additional entries that were created during processing
