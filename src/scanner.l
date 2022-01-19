@@ -7144,7 +7144,7 @@ static void setContext(yyscan_t yyscanner)
   struct yyguts_t *yyg = (struct yyguts_t*)yyscanner;
   yyextra->language    = getLanguageFromFileName(yyextra->yyFileName);
   yyextra->insideIDL   = yyextra->language==SrcLangExt_IDL;
-  yyextra->insideJava  = true;
+  yyextra->insideJava  = yyextra->language==SrcLangExt_Java;
   yyextra->insideCS    = yyextra->language==SrcLangExt_CSharp;
   yyextra->insideD     = yyextra->language==SrcLangExt_D;
   yyextra->insidePHP   = yyextra->language==SrcLangExt_PHP;
